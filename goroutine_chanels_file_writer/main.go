@@ -52,32 +52,35 @@ func main() {
 	wg := &sync.WaitGroup{}
 
 	timeStart := time.Now()
-	users := generateUsers(10000)
 
-	for i, user := range users {
+	users_channel := make(chan User)
+	go generateUsers(10000, users_channel)
+
+	counter := 1
+	for user := range users_channel {
 		wg.Add(1)
 		go func () {
-			file, err := os.OpenFile(fmt.Sprintf("logs/user%v.txt", i+1), os.O_RDWR | os.O_CREATE, 0644)
+			file, err := os.OpenFile(fmt.Sprintf("logs/user%v.txt", counter), os.O_RDWR | os.O_CREATE, 0644)
 			if err != nil {
-				panic(fmt.Sprintf("cannot create file user%v.txt", i+1))
+				panic(fmt.Sprintf("cannot create file user%v.txt", counter))
 			}
 	
 			file.WriteString(user.returnUserInfo())
 			wg.Done()
 		}()
+		counter++
 	}
 
 	wg.Wait()
 	fmt.Println("time working: ", time.Since(timeStart))
 }
 
-func generateUsers(count int) []User {
-	var result []User
+func generateUsers(count int, user_chan chan<- User) {
 	for i := 0; i < count; i++ {
-		result = append(result, User{ id: fmt.Sprint(i+1), name: fmt.Sprintf("User%v", i+1), role: getRandomRoles(), logs: getRandomLogs() })
+		user_chan <- User{ id: fmt.Sprint(i+1), name: fmt.Sprintf("User%v", i+1), role: getRandomRoles(), logs: getRandomLogs() }
 	}
 
-	return result
+	close(user_chan)
 }
 
 func getRandomRoles() []string {
@@ -120,3 +123,15 @@ func getRandomLogs() []TLogs {
 
 	return result
 }
+
+// without Channels:
+// file creaing time working:  308.19075ms
+// time working:  181.258625ms
+// time working:  199.9265ms
+// time working:  162.427208ms
+
+// with Channels:
+// file creating time working:  213.765792ms
+// time working:  171.494084ms
+// time working:  145.147417ms
+// time working:  126.472ms
